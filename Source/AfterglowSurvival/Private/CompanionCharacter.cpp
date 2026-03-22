@@ -1,6 +1,7 @@
 ﻿#include "CompanionCharacter.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "CompanionAIController.h"
+#include "AIController.h"
 #include "Engine/World.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -38,6 +39,10 @@ ACompanionCharacter::ACompanionCharacter()
     SpawnPoolActorTag = TEXT("ProjectilePool");
     SpawnFromPoolFunctionName = TEXT("SpawnFromPool");
     CachedSpawnPoolActor = nullptr;
+
+    MaxHealth = 250.f;
+    CurrentHealth = MaxHealth;
+    bIsDead = false;
 }
 
 float ACompanionCharacter::GetAnimSpeed() const
@@ -80,11 +85,35 @@ void ACompanionCharacter::BeginPlay()
 {
     Super::BeginPlay();
 
+    CurrentHealth = MaxHealth;
+    bIsDead = false;
+
     ResolveSpawnPoolActor();
+}
+
+float ACompanionCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+    if (bIsDead || DamageAmount <= 0.f)
+    {
+        return 0.f;
+    }
+
+    const float AppliedDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+    const float EffectiveDamage = AppliedDamage > 0.f ? AppliedDamage : DamageAmount;
+    CurrentHealth -= EffectiveDamage;
+
+    if (CurrentHealth <= 0.f)
+    {
+        CurrentHealth = 0.f;
+        HandleCompanionDeath();
+    }
+
+    return EffectiveDamage;
 }
 
 bool ACompanionCharacter::FireAt(AActor* Target)
 {
+    if (bIsDead) return false;
     if (!Target) return false;
 
     UWorld* World = GetWorld();
@@ -164,6 +193,30 @@ bool ACompanionCharacter::FireAt(AActor* Target)
     UE_LOG(LogTemp, Verbose, TEXT("Companion fired projectile at %s"), *Target->GetName());
 
     return true;
+}
+
+void ACompanionCharacter::HandleCompanionDeath()
+{
+    if (bIsDead)
+    {
+        return;
+    }
+
+    bIsDead = true;
+
+    if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+    {
+        MoveComp->StopMovementImmediately();
+        MoveComp->DisableMovement();
+    }
+
+    if (AAIController* AI = Cast<AAIController>(GetController()))
+    {
+        AI->StopMovement();
+        AI->ClearFocus(EAIFocusPriority::Gameplay);
+    }
+
+    BP_OnCompanionDied();
 }
 
 AActor* ACompanionCharacter::ResolveSpawnPoolActor()

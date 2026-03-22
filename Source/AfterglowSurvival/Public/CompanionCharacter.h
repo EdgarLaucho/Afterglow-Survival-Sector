@@ -12,6 +12,17 @@ class AFTERGLOWSURVIVAL_API ACompanionCharacter : public ACharacter
 public:
     ACompanionCharacter();
 
+    virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
+
+    UFUNCTION(BlueprintPure, Category = "Companion|State")
+    bool IsCompanionDead() const { return bIsDead; }
+
+    UFUNCTION(BlueprintPure, Category = "Companion|State")
+    float GetCurrentHealth() const { return CurrentHealth; }
+
+    UFUNCTION(BlueprintPure, Category = "Companion|State")
+    float GetMaxHealth() const { return MaxHealth; }
+
     UFUNCTION(BlueprintPure, Category = "Companion|Animation")
     float GetAnimSpeed() const;
 
@@ -34,8 +45,20 @@ public:
     UFUNCTION(BlueprintImplementableEvent, Category = "Companion|Combat|Pool")
     void ConfigurePooledProjectile(AActor* Projectile, AActor* Target, FVector ShootDirection);
 
+    UFUNCTION(BlueprintImplementableEvent, Category = "Companion|State")
+    void BP_OnCompanionDied();
+
 protected:
     virtual void BeginPlay() override;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Companion|State")
+    float MaxHealth;
+
+    UPROPERTY(BlueprintReadOnly, Category = "Companion|State")
+    float CurrentHealth;
+
+    UPROPERTY(BlueprintReadOnly, Category = "Companion|State")
+    bool bIsDead;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Companion|Combat|Pool")
     TSubclassOf<AActor> SpawnPoolActorClass;
@@ -74,5 +97,6 @@ protected:
     FName MuzzleSocketName;
 
 private:
+    void HandleCompanionDeath();
     AActor* ResolveSpawnPoolActor();
 };

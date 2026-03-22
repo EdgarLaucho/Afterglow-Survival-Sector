@@ -17,11 +17,4 @@ public:
         AActor* Target,
         float DotThreshold = 0.3f
     );
-
-    UFUNCTION(BlueprintPure, Category = "Combat|Projectile")
-    static FRotator GetSpawnRotationFromLocations(
-        FVector SpawnLocation,
-        FVector TargetLocation,
-        bool bIgnorePitch = false
-    );
 };

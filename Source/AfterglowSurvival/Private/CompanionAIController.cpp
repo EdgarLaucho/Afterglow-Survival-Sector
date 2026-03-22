@@ -103,6 +103,17 @@ void ACompanionAIController::Think()
         return;
     }
 
+    if (const ACompanionCharacter* Companion = Cast<ACompanionCharacter>(MyPawn))
+    {
+        if (Companion->IsCompanionDead())
+        {
+            StopMovement();
+            ClearFocus(EAIFocusPriority::Gameplay);
+            TargetEnemy = nullptr;
+            return;
+        }
+    }
+
     if (TargetEnemy)
     {
         const float DistToTarget = FVector::Dist(MyPawn->GetActorLocation(), TargetEnemy->GetActorLocation());
