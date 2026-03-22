@@ -31,3 +31,24 @@ bool UAfterglowUtils::IsActorInViewCone(AActor* Observer, AActor* Target, float 
 
     return dot > fovDot;
 }
+
+FRotator UAfterglowUtils::GetSpawnRotationFromLocations(FVector SpawnLocation, FVector TargetLocation, bool bIgnorePitch)
+{
+    FVector Direction = (TargetLocation - SpawnLocation).GetSafeNormal();
+    if (Direction.IsNearlyZero())
+    {
+        return FRotator::ZeroRotator;
+    }
+
+    if (bIgnorePitch)
+    {
+        Direction.Z = 0.f;
+        Direction = Direction.GetSafeNormal();
+        if (Direction.IsNearlyZero())
+        {
+            return FRotator::ZeroRotator;
+        }
+    }
+
+    return Direction.Rotation();
+}
