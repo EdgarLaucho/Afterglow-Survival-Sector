@@ -25,7 +25,6 @@ bool UAfterglowUtils::IsActorInViewCone(AActor* Observer, AActor* Target, float 
 
     const auto dot = FVector::DotProduct(camForward, dir);
 
-    // 🔥 Convertimos FOV a dot threshold real
     const auto halfFOV = FMath::DegreesToRadians(cam->GetFOVAngle() * 0.5f);
     const auto fovDot = FMath::Cos(halfFOV);
 

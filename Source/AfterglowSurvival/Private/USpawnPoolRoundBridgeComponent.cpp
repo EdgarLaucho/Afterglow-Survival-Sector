@@ -46,15 +46,45 @@ bool UUSpawnPoolRoundBridgeComponent::ApplyRoundConfig(UURoundConfigDataAsset* R
 		return false;
 	}
 
+	struct FResolvedRoundSetting
+	{
+		int32 EnemyTypeIndex;
+		int32 MaxTotalSpawns;
+		int32 MaxAlive;
+		float SpawnInterval;
+	};
+
+	TArray<FResolvedRoundSetting> ResolvedSettings;
+	ResolvedSettings.Reserve(RoundDefinition.EnemySettings.Num());
+
+	TSet<int32> EnabledTypeIndices;
+	for (int32 SettingsIdx = 0; SettingsIdx < RoundDefinition.EnemySettings.Num(); ++SettingsIdx)
+	{
+		const FEnemyRoundSettings& Settings = RoundDefinition.EnemySettings[SettingsIdx];
+
+		int32 ResolvedTypeIndex = Settings.EnemyTypeIndex;
+		if (ResolvedTypeIndex < 0 || EnabledTypeIndices.Contains(ResolvedTypeIndex))
+		{
+			if (bEnableDebugLogs)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("[RoundBridge] Round setting %d uses duplicate/invalid EnemyTypeIndex=%d. Falling back to settings position index=%d."), SettingsIdx, Settings.EnemyTypeIndex, SettingsIdx);
+			}
+			ResolvedTypeIndex = SettingsIdx;
+		}
+
+		EnabledTypeIndices.Add(ResolvedTypeIndex);
+
+		FResolvedRoundSetting Resolved;
+		Resolved.EnemyTypeIndex = ResolvedTypeIndex;
+		Resolved.MaxTotalSpawns = Settings.MaxTotalSpawns;
+		Resolved.MaxAlive = Settings.MaxAlive;
+		Resolved.SpawnInterval = Settings.SpawnInterval;
+		ResolvedSettings.Add(Resolved);
+	}
+
 	AActor* OwnerActor = GetPoolOwner();
 	if (OwnerActor)
 	{
-		TSet<int32> EnabledTypeIndices;
-		for (const FEnemyRoundSettings& Settings : RoundDefinition.EnemySettings)
-		{
-			EnabledTypeIndices.Add(Settings.EnemyTypeIndex);
-		}
-
 		if (const FArrayProperty* ConfigsArrayProp = FindFProperty<FArrayProperty>(OwnerActor->GetClass(), TEXT("EnemySpawnConfigs")))
 		{
 			void* ArrayContainerPtr = ConfigsArrayProp->ContainerPtrToValuePtr<void>(OwnerActor);
@@ -76,7 +106,7 @@ bool UUSpawnPoolRoundBridgeComponent::ApplyRoundConfig(UURoundConfigDataAsset* R
 	}
 
 	bool bAnyApplied = false;
-	for (const FEnemyRoundSettings& Settings : RoundDefinition.EnemySettings)
+	for (const FResolvedRoundSetting& Settings : ResolvedSettings)
 	{
 		if (bEnableDebugLogs)
 		{
@@ -278,7 +308,21 @@ bool UUSpawnPoolRoundBridgeComponent::ApplyEnemyRoundSettingByReflection(AActor*
 
 	auto SetIntField = [ElementStruct, ElementPtr](const FName& FieldName, int32 Value) -> bool
 	{
-		if (const FIntProperty* IntProp = FindFProperty<FIntProperty>(ElementStruct, FieldName))
+		const FIntProperty* IntProp = FindFProperty<FIntProperty>(ElementStruct, FieldName);
+		if (!IntProp)
+		{
+			const FString Wanted = FieldName.ToString().ToLower();
+			for (TFieldIterator<FIntProperty> It(ElementStruct); It; ++It)
+			{
+				if (It->GetName().ToLower().Contains(Wanted))
+				{
+					IntProp = *It;
+					break;
+				}
+			}
+		}
+
+		if (IntProp)
 		{
 			void* ValuePtr = IntProp->ContainerPtrToValuePtr<void>(ElementPtr);
 			IntProp->SetPropertyValue(ValuePtr, Value);
@@ -289,7 +333,21 @@ bool UUSpawnPoolRoundBridgeComponent::ApplyEnemyRoundSettingByReflection(AActor*
 
 	auto SetFloatField = [ElementStruct, ElementPtr](const FName& FieldName, float Value) -> bool
 	{
-		if (const FFloatProperty* FloatProp = FindFProperty<FFloatProperty>(ElementStruct, FieldName))
+		const FFloatProperty* FloatProp = FindFProperty<FFloatProperty>(ElementStruct, FieldName);
+		if (!FloatProp)
+		{
+			const FString Wanted = FieldName.ToString().ToLower();
+			for (TFieldIterator<FFloatProperty> It(ElementStruct); It; ++It)
+			{
+				if (It->GetName().ToLower().Contains(Wanted))
+				{
+					FloatProp = *It;
+					break;
+				}
+			}
+		}
+
+		if (FloatProp)
 		{
 			void* ValuePtr = FloatProp->ContainerPtrToValuePtr<void>(ElementPtr);
 			FloatProp->SetPropertyValue(ValuePtr, Value);
@@ -346,9 +404,28 @@ bool UUSpawnPoolRoundBridgeComponent::IsRoundCompletedByReflection(AActor* Owner
 	FScriptArrayHelper ArrayHelper(ConfigsArrayProp, ArrayContainerPtr);
 
 	UStruct* ElementStruct = StructInner->Struct;
-	const FIntProperty* MaxTotalSpawnsProp = FindFProperty<FIntProperty>(ElementStruct, TEXT("MaxTotalSpawns"));
-	const FIntProperty* TotalSpawnedProp = FindFProperty<FIntProperty>(ElementStruct, TEXT("TotalSpawned"));
-	const FIntProperty* CurrentAliveProp = FindFProperty<FIntProperty>(ElementStruct, TEXT("CurrentAlive"));
+	auto FindIntPropSmart = [ElementStruct](const TCHAR* ExactName) -> const FIntProperty*
+	{
+		if (const FIntProperty* Exact = FindFProperty<FIntProperty>(ElementStruct, ExactName))
+		{
+			return Exact;
+		}
+
+		const FString Wanted = FString(ExactName).ToLower();
+		for (TFieldIterator<FIntProperty> It(ElementStruct); It; ++It)
+		{
+			if (It->GetName().ToLower().Contains(Wanted))
+			{
+				return *It;
+			}
+		}
+
+		return nullptr;
+	};
+
+	const FIntProperty* MaxTotalSpawnsProp = FindIntPropSmart(TEXT("MaxTotalSpawns"));
+	const FIntProperty* TotalSpawnedProp = FindIntPropSmart(TEXT("TotalSpawned"));
+	const FIntProperty* CurrentAliveProp = FindIntPropSmart(TEXT("CurrentAlive"));
 
 	if (!MaxTotalSpawnsProp || !TotalSpawnedProp || !CurrentAliveProp)
 	{
