@@ -36,6 +36,7 @@ void AAZombieAIController::OnUnPossess()
 		World->GetTimerManager().ClearTimer(ThinkTimer);
 	}
 
+    ClearFocus(EAIFocusPriority::Gameplay);
 	CurrentTarget = nullptr;
 	Super::OnUnPossess();
 }
@@ -62,6 +63,7 @@ void AAZombieAIController::Think()
 	if (!Zombie || !Zombie->IsZombieAlive())
 	{
 		StopMovement();
+     ClearFocus(EAIFocusPriority::Gameplay);
 		return;
 	}
 
@@ -123,6 +125,7 @@ void AAZombieAIController::HandleChaseOrAttack()
 	{
 		CurrentTarget = nullptr;
 		StopMovement();
+     ClearFocus(EAIFocusPriority::Gameplay);
 		return;
 	}
 
@@ -148,8 +151,9 @@ void AAZombieAIController::HandleChaseOrAttack()
 	}
 
 	LastRepathTime = now;
+	ClearFocus(EAIFocusPriority::Gameplay);
 
-	const EPathFollowingRequestResult::Type MoveResult = MoveToActor(TargetActor, MoveAcceptance, true, true, true);
+    const EPathFollowingRequestResult::Type MoveResult = MoveToActor(TargetActor, MoveAcceptance, true, true, false);
 	if (MoveResult == EPathFollowingRequestResult::Failed)
 	{
 		++ConsecutivePathFailures;
