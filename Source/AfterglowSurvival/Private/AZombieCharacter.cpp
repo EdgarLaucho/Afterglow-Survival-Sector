@@ -13,6 +13,14 @@ AAZombieCharacter::AAZombieCharacter()
 	PrimaryActorTick.bCanEverTick = false;
 	AIControllerClass = AAZombieAIController::StaticClass();
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
+   bUseControllerRotationYaw = false;
+
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		MoveComp->bOrientRotationToMovement = true;
+		MoveComp->bUseControllerDesiredRotation = false;
+	}
+
 	AttackTraceSocketName = TEXT("AttackSocket");
 	bIsDead = false;
 	bIsAttacking = false;
@@ -213,12 +221,14 @@ void AAZombieCharacter::OnDeathFinished()
 			FTransform CorpseTransform = GetActorTransform();
 			CorpseTransform.AddToTranslation(ZombieCorpseSpawnOffset);
 
-			FActorSpawnParameters SpawnParams;
+            FActorSpawnParameters SpawnParams;
 			SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
 			AActor* SpawnedCorpse = World->SpawnActor<AActor>(ZombieCorpseClass, CorpseTransform, SpawnParams);
 			if (SpawnedCorpse)
 			{
+               SpawnedCorpse->SetActorHiddenInGame(true);
+
 				UFunction* InitFn = SpawnedCorpse->FindFunction(FName(TEXT("Init")));
 				if (InitFn)
 				{
@@ -232,6 +242,9 @@ void AAZombieCharacter::OnDeathFinished()
 
 					SpawnedCorpse->ProcessEvent(InitFn, &Params);
 				}
+
+             SetActorHiddenInGame(true);
+				SpawnedCorpse->SetActorHiddenInGame(false);
 			}
 		}
 	}
